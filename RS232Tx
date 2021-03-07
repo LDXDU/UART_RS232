@@ -1,0 +1,92 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module uart_test(	
+//input				serial_rxd,	
+output				serial_txd
+
+);
+
+	wire clk_48;
+	wire reset = 0;
+	
+
+	HSOSC u_hfosc (
+		.CLKHFPU(1'b1),
+		.CLKHFEN(1'b1),
+		.CLKHF(clk_48)
+	);
+
+
+//-------------------------------------------------------------------------------
+//wire 				rx_byte_rdy;
+//wire 	[7:0]		rx_byte;
+//
+//RS232Rx RS232Rx(
+//    .reset_n		(!reset),
+//    .clk			(clk_48),
+//    .rs232_rxline	(MCU_UART2_RX),
+//    .SmplCLKP		(13'd142),                 //115200Baud
+//    .rx_byte_rdy	(rx_byte_rdy),
+//    .rx_byte		(rx_byte)
+//	);
+//-------------------------------------------------------------------------------
+reg 	[3:0] 		byte_counter;
+
+reg  				tx_seg_rdy;
+wire  	[31:0]		tx_seg;
+reg		[7:0]		tx_seg_r;
+wire				rs232_txfull;
+wire				almost_full_o;
+
+RS232Tx RS232Tx(
+    .reset_n		(!reset),
+    .clk			(clk_48),
+    .TSmplCLKP		(16'd24),           //115200Baud
+    .tx_seg_rdy		(tx_seg_rdy),
+    .tx_seg			(tx_seg),
+    .rs232_txline	(serial_txd),
+    .rs232_txfull	(rs232_txfull),
+	.almost_full_o	(almost_full_o),
+    .rs232_txempty	(rs232_txempty)
+	);
+//-------------------------------------------------------------------------------
+
+assign	tx_seg = {4{tx_seg_r}};
+
+always @(posedge clk_48) 
+	begin
+		if(reset)
+			begin
+				tx_seg_rdy <= 0;
+				tx_seg_r <= "A";
+				byte_counter <= 0;
+			end
+		else
+			begin
+				if(!almost_full_o)
+					begin
+						tx_seg_rdy <= 1;
+						
+						if (byte_counter == 0)
+							tx_seg_r <= "\r";
+						else
+						if (byte_counter == 1)
+							tx_seg_r <= "\n";
+						else
+							tx_seg_r <= "A" + byte_counter - 2;
+						byte_counter <= byte_counter + 1;
+					end
+				else
+					begin
+						tx_seg_rdy <= 0;
+					end
+			end
+	end
+	
+
+
+	
+
+endmodule
